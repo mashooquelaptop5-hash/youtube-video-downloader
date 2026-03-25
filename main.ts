@@ -1,10 +1,10 @@
 import { Hono } from "https://deno.land/x/hono@v4.0.0/mod.ts";
-// Using a more modern, Deno 2 compatible port
-import ytdl from "https://deno.land/x/ytdl_core_deno@v0.0.3/mod.ts";
+// Using the official npm package directly in Deno
+import ytdl from "npm:ytdl-core";
 
 const app = new Hono();
 
-app.get("/", (c) => c.text("YouTube API is Running! Use /info?url=URL"));
+app.get("/", (c) => c.text("YouTube API is Live on Deno 2.0!"));
 
 // 🎥 VIDEO INFO API
 app.get("/info", async (c) => {
@@ -12,16 +12,22 @@ app.get("/info", async (c) => {
   if (!url) return c.json({ error: "Missing url parameter" }, 400);
 
   try {
+    // Basic validation
+    if (!ytdl.validateURL(url)) {
+      return c.json({ error: "Invalid YouTube URL" }, 400);
+    }
+
     const info = await ytdl.getInfo(url);
     
     const result = {
       title: info.videoDetails.title,
       thumbnail: info.videoDetails.thumbnails[0].url,
       duration: info.videoDetails.lengthSeconds,
+      // Map formats to a clean structure
       formats: info.formats
         .filter((f) => f.container === "mp4" && f.hasVideo)
         .map((f) => ({
-          quality: f.qualityLabel,
+          quality: f.qualityLabel || f.quality,
           url: f.url,
         })),
       audio: info.formats
@@ -34,11 +40,12 @@ app.get("/info", async (c) => {
 
     return c.json(result);
   } catch (err) {
+    console.error(err);
     return c.json({ error: "Failed to fetch info", details: err.message }, 500);
   }
 });
 
-// 🎧 AUDIO REDIRECT
+// 🎧 AUDIO ONLY URL
 app.get("/audio", async (c) => {
   const url = c.req.query("url");
   if (!url) return c.json({ error: "Missing url" }, 400);
