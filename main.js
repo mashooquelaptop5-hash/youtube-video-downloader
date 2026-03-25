@@ -1,32 +1,40 @@
-// Deno Deploy ke liye standard server setup
 Deno.serve(async (request) => {
+  // CORS Headers
+  const headers = {
+    "content-type": "application/json",
+    "Access-Control-Allow-Origin": "*", // Allows any website to call this API
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  // Handle Preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers });
+  }
+
   const url = new URL(request.url);
   const inputUrl = url.searchParams.get('url');
 
-  // 1. Check if URL parameter exists
   if (!inputUrl) {
     return new Response(
       JSON.stringify({ status: 'error', message: 'Please provide a ?url= parameter' }),
-      { status: 400, headers: { "content-type": "application/json" } }
+      { status: 400, headers }
     );
   }
 
-  // 2. Validate YouTube Link
   const isYouTube = inputUrl.includes('youtube.com') || inputUrl.includes('youtu.be');
   if (!isYouTube) {
     return new Response(
       JSON.stringify({ status: 'error', message: 'Invalid YouTube URL' }),
-      { status: 400, headers: { "content-type": "application/json" } }
+      { status: 400, headers }
     );
   }
 
   try {
-    // Video ID extract karne ke liye logic
     const videoId = extractVideoId(inputUrl);
-
-    // YouTube Metadata aur Download link ke liye API try karte hain
-    // Hum ek reliable public API use kar rahe hain jo Deno par stable chalti hai
-    const apiUrl = `https://api.cobalt.tools/api/json`; // Cobalt ek popular open-source engine hai
+    
+    // Using an alternative stable endpoint for Cobalt
+    const apiUrl = `https://api.cobalt.tools/api/json`; 
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -36,7 +44,7 @@ Deno.serve(async (request) => {
       },
       body: JSON.stringify({
         url: inputUrl,
-        videoQuality: '720', // Default quality
+        videoQuality: '720',
       })
     });
 
@@ -49,29 +57,22 @@ Deno.serve(async (request) => {
           video: data.url,
           title: data.filename || 'YouTube Video',
           thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-          channel: '@old_studio786',
-          note: 'Powered by Deno Deploy'
-        }, null, 2),
-        { 
-          headers: { 
-            "content-type": "application/json",
-            "Access-Control-Allow-Origin": "*" 
-          } 
-        }
+          channel: '@SaNaUsman',
+        }),
+        { headers }
       );
     } else {
-      throw new Error("Could not fetch download link");
+      throw new Error(data.text || "Could not fetch download link");
     }
 
   } catch (err) {
     return new Response(
       JSON.stringify({ status: 'error', message: err.message }),
-      { status: 500, headers: { "content-type": "application/json" } }
+      { status: 500, headers }
     );
   }
 });
 
-// Helper Function: Video ID nikalne ke liye
 function extractVideoId(url) {
   const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
   const match = url.match(regExp);
